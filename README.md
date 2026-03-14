@@ -80,7 +80,7 @@ This is the server that sits between your app and the Chrome extension.
 
 ### Step 5 — Open the Extension Shell
 
-1. Click the **Gemini Automator** icon in the Chrome toolbar
+1. Click the **Gemini Automator** icon in the Chrome extensions list
 2. A new tab opens showing the shell UI
 3. Wait a few seconds — the status badge should change to **connected**
 
