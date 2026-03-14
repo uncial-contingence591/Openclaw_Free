@@ -114,34 +114,34 @@ You should get back a JSON response in the server terminal containing Gemini's r
 ---
 
 ## Part 2 — WSL2 + OpenClaw Setup
-
+ 
 > ⚠️ **Only follow this part if:**
 > - You are using **OpenClaw inside WSL2** (Windows Subsystem for Linux), AND
 > - Chrome and the Node server are running on the **same Windows machine** as WSL2
 >
 > If OpenClaw is on a completely separate computer, or you're not using WSL at all — **skip this entire section**.
-
+ 
 ### Why this is needed
-
+ 
 WSL2 runs Linux inside a hidden virtual machine on your Windows PC. That virtual machine has its own network, separate from Windows. So when Linux says "localhost", it means the Linux VM — not your Windows machine where Chrome is running.
-
+ 
 To fix this, we need to find the **Windows host IP** (the address Linux uses to talk to Windows) and use that instead of localhost.
-
+ 
 ---
-
+ 
 ### Step 1 — Complete Part 1 First
-
+ 
 Make sure the standard setup is fully working on the Windows side before continuing here.
-
+ 
 ---
-
+ 
 ### Step 2 — Open the Windows Firewall for WSL
-
+ 
 Windows Firewall will block WSL from reaching the Node server by default. You need to add a rule to allow it.
-
+ 
 1. On Windows, click the **Start menu**, search for **PowerShell**, right-click it, and choose **Run as administrator**
 2. Copy and paste this entire block, then press Enter:
-
+ 
 ```powershell
 New-NetFirewallRule `
   -DisplayName "Gemini Automator WSL" `
@@ -150,99 +150,70 @@ New-NetFirewallRule `
   -LocalPort 8765 `
   -Action Allow
 ```
-
+ 
 3. You should see a confirmation that the rule was created. You only ever need to do this once.
-
+ 
 4. Now open your WSL terminal and test that it can reach the server:
-
+ 
 ```bash
 WIN_HOST=$(ip route show | grep -i default | awk '{ print $3 }')
 echo "Your Windows host IP is: $WIN_HOST"
 curl http://$WIN_HOST:8765/
 ```
-
+ 
 You should see something like:
 ```json
 {"object":"list","data":[{"id":"gemini-2.0-flash",...}]}
 ```
-
+ 
 If you see that, the firewall is open and everything is connected. ✅
-
+ 
 ---
-
-### Step 3 — Handle the Changing WSL Host IP
-
-The Windows host IP that WSL uses can change every time you restart your computer. We'll set up a launcher script that automatically detects the correct IP and patches your OpenClaw config every time you start it — so you never have to think about it again.
-
-**3a — Create the launcher script**
-
-In your WSL terminal, run these commands one at a time:
-
+ 
+### Step 3 — Find Your Windows Host IP
+ 
+The Windows host IP is the address WSL uses to reach your Windows machine. Run this in your WSL terminal:
+ 
 ```bash
-mkdir -p ~/bin
+ip route show | grep -i default | awk '{ print $3 }'
 ```
-```bash
-nano ~/bin/start-openclaw.sh
-```
-
-This opens a basic text editor in your terminal. Copy and paste the following:
-
-```bash
-#!/usr/bin/env bash
-
-# Detect the current Windows host IP
-WIN_HOST=$(ip route show | grep -i default | awk '{ print $3 }')
-echo "Windows host IP: $WIN_HOST"
-
-# Patch the IP in your OpenClaw config (handles any previous IP)
-sed -i "s|http://[0-9.]*:8765|http://$WIN_HOST:8765|g" ~/.openclaw/config.js
-
-echo "Config patched. Starting OpenClaw..."
-openclaw
-```
-
-To save: press `Ctrl + O`, then `Enter`, then `Ctrl + X` to exit.
-
-**3b — Make the script runnable**
-
-```bash
-chmod +x ~/bin/start-openclaw.sh
-```
-
-From now on, always start OpenClaw with:
-```bash
-~/bin/start-openclaw.sh
-```
-instead of typing `openclaw` directly.
-
+ 
+It will print something like `172.22.16.1` or `192.168.x.x`. **Write this number down** — you'll need it in the next step.
+ 
+> ⚠️ This IP can change after a reboot. If things stop working after restarting your PC, re-run this command and update the `baseUrl` in your OpenClaw config to match the new IP.
+ 
 ---
-
+ 
 ### Step 4 — Add the Gemini Provider to OpenClaw Config
-
-We need to tell OpenClaw that Gemini Automator exists and how to talk to it.
-
-First, find out your Linux username by running this in WSL:
-
+ 
+First, run OpenClaw's onboarding command to set up the daemon:
+ 
+```bash
+openclaw onboard --install-daemon
+```
+ 
+Follow any prompts it gives you. Once that's done, find your Linux username:
+ 
 ```bash
 whoami
 ```
-
-It will print something like `hunter`, `john`, `alice` — whatever yours is, keep it in mind for the next step.
-
+ 
+It will print something like `john`, `alice` — whatever yours is, keep it in mind.
+ 
 Now open your OpenClaw config file:
-
+ 
 ```bash
 nano ~/.openclaw/config.js
 ```
-
-Find the `models` section and merge in the following. **Replace `YOUR_USERNAME` with what `whoami` printed.** The `baseUrl` uses a placeholder IP — the launcher script from Step 3 patches it automatically every time, so leave it as-is:
-
+ 
+Find the `models` section and merge in the following. **Replace `YOUR_USERNAME` with what `whoami` printed, and replace `YOUR_WINDOWS_IP` with the IP you found in Step 3:**
+ 
 ```js
 models: {
   mode: 'merge',
   providers: {
     'gemini-local': {
-      baseUrl: 'http://0.0.0.0:8765',  // ← placeholder; auto-patched by start-openclaw.sh
+      baseUrl: 'http://YOUR_WINDOWS_IP:8765',  // ← replace with IP from Step 3
       apiKey: 'none',
       api: 'openai-completions',
       authHeader: false,
@@ -262,7 +233,7 @@ models: {
     },
   },
 },
-
+ 
 agents: {
   defaults: {
     model: { primary: 'gemini-local/gemini-2.0-flash' },
@@ -286,116 +257,110 @@ agents: {
   ],
 },
 ```
-
+ 
 Save with `Ctrl + O`, `Enter`, then `Ctrl + X`.
-
-> 💡 **Tip:** If you want to skip manually replacing `YOUR_USERNAME`, you can run this one-liner after pasting — it fills it in automatically:
-> ```bash
-> sed -i "s|YOUR_USERNAME|$USER|g" ~/.openclaw/config.js
-> ```
-
+ 
 ---
-
+ 
 ### Step 5 — Every Session Startup Order
-
+ 
 Follow this exact order every time you sit down to use it:
-
+ 
 ```
 ── On Windows first ─────────────────────────────────────────
   1. Open a terminal in the project folder and run:
          node http-server.js
      → Wait until you see: 🚀 Gemini Automator Bridge active on port 8765
-
+ 
   2. Click the Gemini Automator icon in Chrome
      → A shell tab opens. Wait for the status badge to show "connected"
      → Keep this tab open the entire session — do not close it
-
+ 
 ── Then in WSL ──────────────────────────────────────────────
   3. Run:
-         ~/bin/start-openclaw.sh
-     → It will print your Windows host IP and patch the config automatically
-     → Then OpenClaw starts normally
+         openclaw
+     → If the daemon is running (installed in Step 4), it starts automatically
 ```
-
+ 
 ---
-
+ 
 ### Step 6 — Verify Everything Is Working
-
+ 
 Run these from your WSL terminal in order:
-
+ 
 ```bash
 # Step 1 — confirm your Windows IP is visible from WSL
 WIN_HOST=$(ip route show | grep -i default | awk '{ print $3 }')
 echo $WIN_HOST
 # Should print something like: 172.22.16.1
-
+ 
 # Step 2 — confirm the bridge is reachable
 curl http://$WIN_HOST:8765/
 # Should print: {"object":"list","data":[{"id":"gemini-2.0-flash",...}]}
-
+ 
 # Step 3 — send a full test prompt end-to-end
 curl -X POST http://$WIN_HOST:8765/gemini \
   -H "Content-Type: application/json" \
   -d '{"prompt":"Reply with just the word READY."}'
 # Should print: {"choices":[{"message":{"content":"READY"}}],...}
 ```
-
+ 
 **Something not working?**
-
+ 
 | What went wrong | Most likely cause | How to fix |
 |----------------|------------------|------------|
 | `echo $WIN_HOST` prints nothing | WSL networking issue | Run `wsl --shutdown` in PowerShell, then reopen WSL |
 | `curl` says "connection refused" | Node server isn't running | Go to Windows and run `node http-server.js` |
 | `curl` says "connection timed out" | Firewall rule missing | Redo Step 2 (the PowerShell firewall command) |
 | Gets no reply or times out | Shell tab is closed | Click the extension icon in Chrome, wait for "connected" |
-
+ 
 ---
-
+ 
 ## Troubleshooting
-
+ 
 **"Port already in use" error when starting the server**
-
+ 
 Something else is already using port 8765. You can use a different port:
 ```bash
 PORT=9000 node http-server.js
 ```
 If you do this, also open `http-bridge.js` in a text editor and change `http://localhost:8765` to `http://localhost:9000`.
-
+ 
 ---
-
+ 
 **Shell tab shows "disconnected"**
-
+ 
 The extension can't reach the Node server. Make sure `node http-server.js` is still running in your terminal — it stops if you close that window.
-
+ 
 ---
-
+ 
 **Gemini tab never appears, or response is empty**
-
+ 
 - Make sure you're signed into a Google account in Chrome that has access to Gemini
 - Open Chrome DevTools on the shell tab (`F12` → Console tab) and look for red error messages
 - If Gemini's website updated recently, its page layout may have changed and the selectors in `background.js` may need updating
-
+ 
 ---
-
+ 
 **Requests always time out**
-
+ 
 For very long prompts, the default 3-minute timeout may not be enough. Open `http-server.js` in a text editor and find the line `TIMEOUT_MS` — increase the number (it's in milliseconds, so `300000` = 5 minutes).
-
+ 
 ---
-
+ 
 ## Known Limitations
-
+ 
 - **No true streaming** — the full response is read from the page after Gemini finishes typing. SSE returns it as one chunk.
 - **Token counts are always 0** — there's no way to get them through the browser.
 - **One request at a time** — if multiple requests come in at once, they wait in a queue.
 - **Breaks if Gemini's website updates** — if Google changes the Gemini page layout, the selectors in `background.js` may need to be updated to match.
 - **Requires Chrome to stay open** — the extension uses your existing Google login and can't run without a real browser session.
 - **File attachments may not always work** — attachment injection uses browser drag-and-drop simulation, which can break if Gemini's UI changes.
-
+ 
 ---
-
+ 
 ## How It Works
-
+ 
 ```
 Your App  (curl, Python, OpenAI SDK, OpenClaw…)
         │  POST /gemini  or  /v1/chat/completions
@@ -417,5 +382,5 @@ background.js  ── Chrome extension service worker
   • Watches the page for Gemini's response using a MutationObserver
   • Returns the response text once Gemini stops typing
 ```
-
+ 
 In short: your request travels from your app → Node server → Chrome extension → Gemini tab → back the same way. The whole thing typically takes a few seconds depending on how long Gemini takes to respond.
