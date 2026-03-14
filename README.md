@@ -10,10 +10,9 @@ A Chrome extension + Node.js bridge that lets you send prompts to Gemini over a 
 
 Node.js is a program that lets you run the local server that connects everything together. You only need to install it once.
 
-1. Go to **https://nodejs.org**
-2. Click the big **LTS** download button (LTS = stable version, recommended)
-3. Open the downloaded installer and click through it — all the defaults are fine
-4. When it's done, open a terminal to confirm it worked:
+1. Go to **https://nodejs.org/en/download**
+2. Open the downloaded installer and click through it — all the defaults are fine
+3. When it's done, open a terminal to confirm it worked:
 
    **Windows** — press `Win + R`, type `cmd`, press Enter, then run:
    ```
