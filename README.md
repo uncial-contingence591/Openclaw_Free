@@ -186,9 +186,10 @@ It will print something like `172.22.16.1` or `192.168.x.x`. **Write this number
  
 ### Step 4 — Add the Gemini Provider to OpenClaw Config
  
-First, run OpenClaw's onboarding command to set up the daemon:
+First, run OpenClaw's onboarding commands to set up the daemon:
  
 ```bash
+curl -fsSL https://openclaw.ai/install.sh | bash
 openclaw onboard --install-daemon
 ```
  
