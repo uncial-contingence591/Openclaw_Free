@@ -89,24 +89,28 @@ This is the server that sits between your app and the Chrome extension.
 ---
 
 ### Step 6 — Test It
-
-Open a new terminal window (keep the server one open) and run:
-
+ 
+Open a **new** terminal window (keep the server one open) and use the command for your OS:
+ 
+**Windows — Command Prompt:**
+```cmd
+curl -X POST http://localhost:8765/gemini -H "Content-Type: application/json" -d "{\"prompt\": \"Say hello!\"}"
+```
+ 
+**Windows — PowerShell:**
+```powershell
+Invoke-WebRequest -Uri http://localhost:8765/gemini -Method Post -ContentType "application/json" -Body '{"prompt": "Say hello!"}'
+```
+ 
+**Mac / Linux:**
 ```bash
 curl -X POST http://localhost:8765/gemini \
   -H "Content-Type: application/json" \
   -d '{"prompt": "Say hello!"}'
 ```
-
-> ❓ **Don't have curl?**
-> - **Windows:** curl is built into Windows 10/11. If it doesn't work, use PowerShell instead:
->   ```powershell
->   Invoke-WebRequest -Uri http://localhost:8765/gemini -Method Post -ContentType "application/json" -Body '{"prompt":"Say hello!"}'
->   ```
-> - **Mac:** curl is pre-installed, it should just work.
-
+ 
 You should get back a JSON response containing Gemini's reply. That's it for the standard setup! ✅
-
+ 
 ---
 
 ## Part 2 — WSL2 + OpenClaw Setup
