@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Gemini Automator",
+  "description": "Run Gemini flows from a full-page UI or background service worker.",
+  "version": "1.0.0",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": [
+    "tabs",
+    "scripting",
+    "storage",
+    "clipboardRead",
+    "clipboardWrite"
+  ],
+  "host_permissions": [
+    "https://gemini.google.com/*",
+    "http://localhost:8765/*"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["gemini-shell.html", "shell.js"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "action": {}
+}
