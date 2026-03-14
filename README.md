@@ -194,7 +194,7 @@ In your WSL terminal:
 curl -fsSL https://openclaw.ai/install.sh | bash
 ```
  
-Follow any prompts it gives you. This sets up OpenClaw as a background service so you don't have to start it manually each time.
+Follow any prompts it gives you: Yes -> Quickstart -> Use Existing Values -> Skip for now(press up arrow, its at the bottom) -> enter -> enter -> skip for now -> skip for now -> No, don't configure skills. -> skip for now -> restart. Now, open the Web UI! It should look like http://127.0.0.1:18789/#token=xyz (it's printed in the console)
  
 ---
  
@@ -208,26 +208,15 @@ It prints something like `john` or `alice`. Write it down — you'll need it in 
  
 ---
  
-**4c — Open the OpenClaw web UI**
  
-Once the daemon is running, open your browser and go to:
- 
-```
-http://localhost:18789
-```
- 
-This is the OpenClaw web interface.
- 
----
- 
-**4d — Open the config editor**
+**4c — Open the config editor**
  
 1. In the web UI, click **Config** in the sidebar (or top navigation)
 2. Look for a **Raw** button and click it — this switches from the visual editor to a plain text view where you can paste directly
  
 ---
  
-**4e — Paste the config**
+**4d — Paste the config**
  
 Select and delete everything currently in the raw config editor, then paste in the following.
  
