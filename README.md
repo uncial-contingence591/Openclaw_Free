@@ -109,7 +109,7 @@ curl -X POST http://localhost:8765/gemini \
   -d '{"prompt": "Say hello!"}'
 ```
  
-You should get back a JSON response containing Gemini's reply. That's it for the standard setup! ✅
+You should get back a JSON response in the server terminal containing Gemini's reply. That's it for the standard setup! ✅
  
 ---
 
