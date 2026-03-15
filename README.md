@@ -332,8 +332,8 @@ Click **Save** when done.
  
 ---
 
- ### Step 5 - Shortening the prompt for AI models
- Make it easier for ai models to understand
+ ### Step 5 - Shortening the prompt for AI models(Only for non pro users)
+ You will also need to do /new to clear chat history often to stay within prompting context limits for standard users.
  ```
 mkdir -p "$HOME/.openclaw/workspace-gemini-local"
 
@@ -380,7 +380,7 @@ Discord/WhatsApp: no markdown tables, use bullets. Wrap Discord links in < >.
 Check SKILL.md when needed. Store local notes in TOOLS.md.
 EOF
 ```
-### Step 5 — Every Session Startup Order
+### Step 6 — Every Session Startup Order
  
 Follow this exact order every time you sit down to use it:
  
@@ -402,7 +402,7 @@ Follow this exact order every time you sit down to use it:
  
 ---
  
-### Step 6 — Verify Everything Is Working
+### Step 7 — Verify Everything Is Working
  
 Run these from your WSL terminal in order:
  
