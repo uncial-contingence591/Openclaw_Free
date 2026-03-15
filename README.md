@@ -333,7 +333,7 @@ Click **Save** when done.
 ---
 
  ### Step 5 - Shortening the prompt for AI models(Only for non pro users)
- You will also need to do /new to clear chat history often to stay within prompting context limits for standard users.
+ ⚠️You will also need to do /new to clear chat history often to stay within prompting context limits for standard users.
  ```
 mkdir -p "$HOME/.openclaw/workspace-gemini-local"
 
