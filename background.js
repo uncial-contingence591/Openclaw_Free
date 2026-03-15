@@ -133,10 +133,24 @@ async function runGeminiFlow(prompt, attachments) {
   await retryEnsureInput(tab.id, 3, 1000);
   bglog('→ input ready');
 
+  // Convert prompt to prompt.txt and drag-drop it onto the composer
+  bglog('→ converting prompt to prompt.txt');
+  const promptDataURL = 'data:text/plain;charset=utf-8,' + encodeURIComponent(prompt);
+  let fileAttached = false;
+  try {
+    await injectFileIntoPage(tab.id, { name: 'prompt.txt', type: 'text/plain', dataURL: promptDataURL });
+    bglog('→ prompt.txt attached successfully');
+    fileAttached = true;
+    await new Promise(r => setTimeout(r, 50));
+  } catch (err) {
+    bglog('→ prompt.txt drag-drop failed:', err);
+  }
+
+  // Any extra caller-supplied attachments
   if (attachments && attachments.length) {
     for (const att of attachments) {
       if (!att) continue;
-      bglog('→ attaching file to Gemini composer:', att.name);
+      bglog('→ attaching extra file:', att.name);
       try {
         if (att.dataURL) {
           await injectFileIntoPage(tab.id, att);
@@ -144,19 +158,27 @@ async function runGeminiFlow(prompt, attachments) {
           const dataURL = `data:${att.type};charset=utf-8,` + encodeURIComponent(att.data);
           await injectFileIntoPage(tab.id, { name: att.name, type: att.type, dataURL });
         } else {
-          bglog('→ attachment missing expected fields, skipping', att);
+          bglog('→ extra attachment missing fields, skipping', att);
           continue;
         }
-        bglog('→ attachment injected');
+        bglog('→ extra attachment injected');
       } catch (err) {
-        bglog('→ attachment injection failed:', err);
+        bglog('→ extra attachment injection failed:', err);
       }
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 50));
     }
   }
 
-  await sendPrompt(tab.id, prompt);
-  bglog('→ prompt injected');
+  if (fileAttached) {
+    // File was attached — just send a short trigger to enable the Send button
+    await sendPrompt(tab.id, 'Please read and respond to the attached file.');
+    bglog('→ trigger message sent');
+  } else {
+    // Drag-drop failed — fall back to pasting the prompt as plain text
+    bglog('→ falling back to plain text prompt');
+    await sendPrompt(tab.id, prompt);
+    bglog('→ fallback prompt injected');
+  }
 
   const reply = await waitForResponse(tab.id, 60000, 2000);
   bglog('→ response received');
@@ -316,7 +338,7 @@ async function sendPrompt(tabId, prompt) {
           }));
         }
         resolve();
-      }, 400));
+      }, 20));
     },
     args: [prompt]
   });
@@ -328,7 +350,7 @@ async function injectFileIntoPage(tabId, attachment) {
     func: (att, timeout) => {
       return new Promise((resolve, reject) => {
         try {
-
+          // Build File object from dataURL
           const parts = att.dataURL.split(',');
           const meta = parts[0];
           const isBase64 = meta.indexOf('base64') !== -1;
@@ -341,55 +363,48 @@ async function injectFileIntoPage(tabId, attachment) {
           const blob = new Blob([u8], { type: mime });
           const file = new File([blob], att.name, { type: mime });
 
-          const composerSelectors = [
-            'div[contenteditable="true"]',
-            'rich-textarea',
-            '[role="textbox"]'
-          ];
+          const composer =
+            document.querySelector('div[contenteditable="true"]') ||
+            document.querySelector('rich-textarea') ||
+            document.querySelector('[role="textbox"]');
 
-          const inputFile = document.querySelector('input[type=file]');
-          if (inputFile) {
-            try {
-              const dt = new DataTransfer();
-              dt.items.add(file);
-              inputFile.files = dt.files;
-              inputFile.dispatchEvent(new Event('change', { bubbles: true }));
-            } catch (e) {
-              console.warn('input[type=file] assign failed, trying drag/drop', e);
-              dropOnTarget(file, composerSelectors);
-            }
-          } else {
-            dropOnTarget(file, composerSelectors);
-          }
+          if (!composer) { reject('Gemini composer not found'); return; }
 
-          function dropOnTarget(file, selectors) {
-            const dt = new DataTransfer();
-            dt.items.add(file);
-            let target = null;
-            for (const s of selectors) {
-              const el = document.querySelector(s);
-              if (el) { target = el; break; }
-            }
-            if (!target) target = document.body;
-            const rect = target.getBoundingClientRect();
-            const x = rect.left + rect.width / 2;
-            const y = rect.top + rect.height / 2;
-            target.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt, clientX: x, clientY: y }));
-            setTimeout(() => target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt, clientX: x, clientY: y })), 50);
-          }
+          // Snapshot existing chips so we only resolve on a NEW one
+          const existingChips = new Set(Array.from(document.querySelectorAll('mat-chip')));
 
+          // Paste file via ClipboardEvent — works without isTrusted
+          composer.focus();
+          const dt = new DataTransfer();
+          dt.items.add(file);
+          const pasteEvent = new ClipboardEvent('paste', {
+            bubbles: true,
+            cancelable: true,
+            clipboardData: dt
+          });
+          composer.dispatchEvent(pasteEvent);
+
+          // Wait for a NEW mat-chip to appear
           const start = Date.now();
           const check = () => {
-            const maybe =
-              document.querySelector('[aria-label*="attachment"]') ||
-              document.querySelector('.attachment-preview') ||
-              document.querySelector('.file-chip') ||
-              document.querySelector('mat-chip');
-            if (maybe) return resolve(true);
-            if (Date.now() - start > timeout) return reject('Timeout waiting for Gemini attachment preview');
-            setTimeout(check, 200);
+            const newChip = Array.from(document.querySelectorAll('mat-chip'))
+              .find(c => !existingChips.has(c));
+            if (newChip) {
+              console.log('[inject] attachment chip appeared:', newChip.textContent.trim());
+              return resolve(true);
+            }
+            const preview = document.querySelector('[data-test-id*="attachment"]') ||
+                            document.querySelector('[data-test-id*="chip"]') ||
+                            document.querySelector('.file-chip') ||
+                            document.querySelector('.attachment-preview');
+            if (preview) return resolve(true);
+            if (Date.now() - start > timeout) {
+              return reject('Timeout: no attachment chip appeared after paste');
+            }
+            setTimeout(check, 50);
           };
-          check();
+          setTimeout(check, 50);
+
         } catch (err) {
           reject(err?.toString?.() || String(err));
         }
@@ -398,6 +413,7 @@ async function injectFileIntoPage(tabId, attachment) {
     args: [attachment, 5000]
   }).then(() => true);
 }
+
 
 async function waitForResponse(tabId, timeout = 60000, settleTime = 3500) {
   bglog('waitForResponse: injecting Gemini observer script');
